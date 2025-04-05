@@ -11,10 +11,10 @@ CONFIDENCE_95 = 5  # for 95% confidence
 CONFIDENCE_99 = 1  # for 99% confidence
 
 # This is the number of days to run the simulations over, not the days downloaded from yfinance
-T = 21  # trading days
+T = 5  # trading days
 
 # Download stock data: historical data will be used to calculate returns, log returns, mean and std
-stock = yf.download("GOOGL", start="2024-01-01", end="2025-01-01")
+stock = yf.download("AAPL", start="2024-01-01", end="2025-01-01")
 
 # Calculate daily log returns
 stock["Returns"] = stock['Close'] / stock['Close'].shift(1)
@@ -48,8 +48,7 @@ elif T > 1:
     simulated_prices = np.zeros((number_of_steps, N))
     simulated_prices[0] = S0  # Set initial price for all simulations
 
-print(f"Initial portfolio value ${round(S0, 3)}")
-print()
+print(f"Initial portfolio ${round(S0, 3)}")
 
 # Generate price paths: simulated_prices contains a list with N simulations
 # per each day: if N=10 and trading_days=21. it will be a list with 21 lists of len 10
@@ -68,11 +67,11 @@ percentile_95_array = np.percentile(simulated_prices, CONFIDENCE_95, axis=1)  # 
 max_loss_95 = -round(((S0 - percentile_95) / S0) * 100, 3)
 VaR_95 = S0 - percentile_95
 
-
 percentile_99 = np.percentile(simulated_prices[-1], CONFIDENCE_99)
 percentile_99_array = np.percentile(simulated_prices, CONFIDENCE_99, axis=1)
 max_loss_99 = -round(((S0 - percentile_99) / S0) * 100, 3)
 VaR_99 = S0 - percentile_99
+
 
 # Min expected price during the whole time period: this can be lower than the VaR
 lowest_price = round(np.min(simulated_prices), 3)
