@@ -1,6 +1,7 @@
 
 """
 EXAMPLE STEP BY STEP WITH A PORTFOLIO CONTAINING ONE EQUITY
+A portfolio with only one equity does not need the Cholesky decomposition
 
 1 Download close price for a specific time range (let's say 1 year): the last
   price in this range will be the first for the simulations
