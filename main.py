@@ -2,10 +2,12 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import yfinance as yf
+from scipy.linalg import cholesky
 
 # Ito's lemma is a concept used in the Geometric Brownian Motion and the Stochastic Calculus
 # It corrects for the fact that stock prices follow a lognormal distribution rather than a simple normal distribution
 ITO = 0.5
+DT = 1 / 252  # daily time step: if weekly then 1 / 52
 
 CONFIDENCE_95 = 5  # for 95% confidence
 CONFIDENCE_99 = 1  # for 99% confidence
@@ -13,6 +15,7 @@ CONFIDENCE_99 = 1  # for 99% confidence
 user_input = input("How many stocks in the portfolio: ")
 
 print_charts = False
+
 
 def main():
     if int(user_input) == 1:
@@ -45,8 +48,6 @@ def main():
         all_S = stock["Close"].values.tolist()
         S0 = round(all_S[-1][0], 3) * S  # Last closing price * no of shares (portfolio value)
 
-        # daily time step: if weekly then 1 / 52
-        dt = 1 / 252  # time step
         number_of_steps = T
 
         # Initialize matrix for simulated prices
@@ -65,11 +66,11 @@ def main():
         # per each day: if N=10 and trading_days=21. it will be a list with 21 lists of len 10
         if T == 1:
             rand = np.random.normal(0, 1, N)  # Generate random stocks prices
-            simulated_prices[1] = simulated_prices[0] * np.exp((mu - ITO * sigma**2) + sigma * rand * np.sqrt(dt))
+            simulated_prices[1] = simulated_prices[0] * np.exp((mu - ITO * sigma**2) + sigma * rand * np.sqrt(DT))
         elif T > 1:
             for t in range(1, number_of_steps):
                 rand = np.random.normal(0, 1, N)  # Generate random stocks prices
-                simulated_prices[t] = simulated_prices[t-1] * np.exp((mu - ITO * sigma**2) * dt + sigma * rand * np.sqrt(dt))
+                simulated_prices[t] = simulated_prices[t-1] * np.exp((mu - ITO * sigma**2) * DT + sigma * rand * np.sqrt(DT))
 
         # VaR is calculated out of the final stock price
         percentile_95 = np.percentile(simulated_prices[-1], CONFIDENCE_95)  # worst case out of the last simulation, a scalar
@@ -133,7 +134,113 @@ def main():
             plt.show()
 
     elif int(user_input) > 1:
-        pass  # multiequity portfolio
+        # ask input for the tickers and the number of shares
+        ask_tickers = input("Type the tickers separated by a comma like aapl,msft,cvx: ")
+        tickers = [ticker.strip().upper() for ticker in ask_tickers.split(",")]
+
+        ask_shares = input("For each ticker, type the number of shares separated by a comma: ")
+        try:
+            num_shares = [int(num.strip()) for num in ask_shares.split(",")]
+        except Exception as e:
+            print(e)
+            sys.exit()
+
+        # check that each ticker has a number of shares
+        if len(num_shares) != len(tickers):
+            print("The number of tickers is different from the shares you provided! Cannot proceed")
+            sys.exit()
+
+        # This variables will be used for the matrix
+        num_simulations = int(input(f"How many simulations you want to run? Try at least 1000 "))  # Number of simulations
+        T = int(input(f"How many trading days? The minimum is 1 "))  # trading days to run the simulations over, not the days downloaded from yfinance
+
+        # Fetch data (adjust the period as needed)
+        df = yf.download(tickers, start="2024-01-01", end="2025-01-01")['Close']
+
+        # Drop NaN values (if any)
+        df.dropna(inplace=True)
+
+        # Calculate Log returns
+        log_returns = np.log(df / df.shift(1)).dropna()
+
+        # Compute mean and covariance of log returns
+        # if you use numpy for the cov_matrix (np.cov(log_returns, rowvar=False) * 252)
+        # the result is the same, with very tiny differences
+        mean_returns = log_returns.mean() * 252  # annualized
+        cov_matrix = log_returns.cov() * 252  # annualized
+
+        # print("Mean Returns:\n", mean_returns)
+        # print("Covariance Matrix:\n", cov_matrix)
+
+        # Perform Cholesky decomposition
+        L = cholesky(cov_matrix, lower=True)
+
+        # Generate random normal numbers
+        rand_normals = np.random.randn(T, len(tickers), num_simulations)
+
+        # Apply Cholesky decomposition for correlated shocks
+        correlated_shocks = np.einsum('ij,tjs->tis', L, rand_normals)
+
+        # Create a tensor and set the values at zero
+        simulated_prices = np.zeros((T + 1, len(tickers), num_simulations))
+        # Set the value of the first simulation to the last known price
+        simulated_prices[0] = df.iloc[-1].values[:, np.newaxis]
+
+        # Simulate price paths using Geometric Brownian Motion
+        for t in range(1, T + 1):
+            drift = (mean_returns.values[:, np.newaxis] - 0.5 * np.diag(cov_matrix)[:, np.newaxis]) * DT
+            diffusion = correlated_shocks[t - 1] * np.sqrt(DT)
+            simulated_prices[t] = simulated_prices[t - 1] * np.exp(drift + diffusion)
+
+        # Example simulated paths: replace the second index in simulated_prices[:, 1, 0]
+        # plt.plot(simulated_prices[:, 1, 0])
+        # plt.title(f"Simulated paths for {tickers[1]} using GBM")
+        # plt.xlabel("Days")
+        # plt.ylabel("Price")
+        # plt.legend()
+        # plt.grid(True)
+        # plt.show()
+
+        # for i in range(len(tickers)):
+        #     plt.plot(simulated_prices[:, i, 0], label=f"Item {tickers[i]}")
+        #
+        # plt.title("Simulated paths using GBM")
+        # plt.xlabel("Days")
+        # plt.ylabel("Price")
+        # plt.legend()
+        # plt.grid(True)
+        # plt.show()
+
+        # Compute portfolio values at the beginning and at the end
+        initial_value = np.dot(df.iloc[-1].values, num_shares)
+        final_values = np.dot(simulated_prices[-1].T, num_shares)
+
+        # Compute profit/loss distribution
+        losses = initial_value - final_values
+
+        # Compute 95% Value at Risk
+        VaR_95 = np.percentile(losses, 5)
+        VaR_95_perc = round((VaR_95 / initial_value) * 100, 3)
+
+        # Compute 99% Value at Risk
+        VaR_99 = np.percentile(losses, 1)
+        VaR_99_perc = round((VaR_99 / initial_value) * 100, 3)
+
+        print(f"Initial Portfolio Value: ${initial_value:.2f}")
+        print()
+        print(f"VaR after {T} days with confidence interval 95%: ${VaR_95:.2f} ({VaR_95_perc}%)")
+        print(f"VaR after {T} days with confidence interval 99%: ${VaR_99:.2f} ({VaR_99_perc}%)")
+
+        # Plot loss distribution
+        if print_charts:
+            plt.hist(losses, bins=50, edgecolor='black', alpha=0.7)
+            plt.axvline(VaR_95, color='r', linestyle='dashed', linewidth=2, label=f"VaR 95%: ${VaR_95:.2f}")
+            plt.title("Loss Distribution & VaR - Confidence Interval 95%")
+            plt.xlabel("Loss ($)")
+            plt.ylabel("Frequency")
+            plt.legend()
+            plt.show()
+
     else:
         print("Not sure about the number of equities. Closing...")
         sys.exit()
