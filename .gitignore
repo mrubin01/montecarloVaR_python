@@ -1,6 +1,7 @@
 # Keep these files private
 Test.py
 Example.py
+multiEquityPortfolio.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
