@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from scipy.linalg import cholesky
 import warnings
 warnings.filterwarnings("ignore")
+import functions
 
 # Ito's lemma is a concept used in the Geometric Brownian Motion and the Stochastic Calculus
 # It corrects for the fact that stock prices follow a lognormal distribution rather than a simple normal distribution
@@ -58,7 +59,7 @@ def main():
         print(f"Mean Daily Log Return: {mu:.5f}, Log Volatility: {sigma:.5f}")
         print()
 
-        # This variables will be used for the matrix
+        # These variables will be used for the matrix
         S = int(input(f"How many shares for {ticker}? "))  # no of shares
         N = int(input(f"How many simulations you want to run? Try at least 1000 "))  # Number of simulations
         T = int(input(f"How many trading days? The minimum is 1 "))  # trading days to run the simulations over, not the days downloaded from yfinance
@@ -71,10 +72,10 @@ def main():
 
         # Initialize matrix for simulated prices
         if T == 1:
-            simulated_prices = np.zeros((number_of_steps + 1, N))  # N+1 to include initial price
+            simulated_prices = functions.init_matrix(number_of_steps + 1, N)
             simulated_prices[0] = S0  # Set initial price for all simulations
         elif T > 1:
-            simulated_prices = np.zeros((number_of_steps, N))
+            simulated_prices = functions.init_matrix(number_of_steps, N)
             simulated_prices[0] = S0  # Set initial price for all simulations
 
         print()
@@ -84,11 +85,11 @@ def main():
         # Generate price paths: simulated_prices contains a list with N simulations
         # per each day: if N=10 and trading_days=21. it will be a list with 21 lists of len 10
         if T == 1:
-            rand = np.random.normal(0, 1, N)  # Generate random stocks prices
+            rand = functions.generate_normal_samples(N)  # Generate random values with normal distribution
             simulated_prices[1] = simulated_prices[0] * np.exp((mu - ITO * sigma**2) + sigma * rand * np.sqrt(DT))
         elif T > 1:
             for t in range(1, number_of_steps):
-                rand = np.random.normal(0, 1, N)  # Generate random stocks prices
+                rand = functions.generate_normal_samples(N)
                 simulated_prices[t] = simulated_prices[t-1] * np.exp((mu - ITO * sigma**2) * DT + sigma * rand * np.sqrt(DT))
 
         # VaR is calculated out of the final stock price
@@ -210,7 +211,7 @@ def main():
         correlated_shocks = np.einsum('ij,tjs->tis', L, rand_normals)
 
         # Create a tensor and set the values at zero
-        simulated_prices = np.zeros((T + 1, len(tickers), num_simulations))
+        simulated_prices = functions.init_tensor(T + 1, len(tickers), num_simulations)   # np.zeros((T + 1, len(tickers), num_simulations))
         # Set the value of the first simulation to the last known price
         simulated_prices[0] = df.iloc[-1].values[:, np.newaxis]
 
