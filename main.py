@@ -2,7 +2,10 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import yfinance as yf
+from datetime import datetime, timedelta
 from scipy.linalg import cholesky
+import warnings
+warnings.filterwarnings("ignore")
 
 # Ito's lemma is a concept used in the Geometric Brownian Motion and the Stochastic Calculus
 # It corrects for the fact that stock prices follow a lognormal distribution rather than a simple normal distribution
@@ -12,19 +15,34 @@ DT = 1 / 252  # daily time step: if weekly then 1 / 52
 CONFIDENCE_95 = 5  # for 95% confidence
 CONFIDENCE_99 = 1  # for 99% confidence
 
-user_input = input("How many stocks in the portfolio: ")
+yesterday = datetime.now() - timedelta(days=1)
+END_DATE = yesterday.strftime('%Y-%m-%d')
+
+today = datetime.now()
+START_DATE = datetime(today.year - 1, 1, 1).strftime("%Y-%m-%d")
 
 print_charts = False
+
+print(f"<-- It will be used data starting from {START_DATE} to {END_DATE} -->")
+print()
+user_input = input("How many stocks in the portfolio: ")
 
 
 def main():
     if int(user_input) == 1:
         ticker = input("Type the ticker: ").upper()
 
-        print(f"We are going to download the data for {ticker} in 2024")
-
         # Download stock data: historical data will be used to calculate returns, log returns, mean and std
-        stock = yf.download(ticker, start="2024-01-01", end="2025-01-01")
+        try:
+            stock = yf.download(ticker, start=START_DATE, end=END_DATE)
+        except Exception as e:
+            print(e)
+            sys.exit()
+
+        # Check that yfinance does not return an empty dataframe
+        if stock.empty:
+            print(f"No data returned for ticker '{ticker}'")
+            sys.exit()
 
         # Calculate daily log returns
         stock["Returns"] = stock['Close'] / stock['Close'].shift(1)
@@ -45,8 +63,9 @@ def main():
         N = int(input(f"How many simulations you want to run? Try at least 1000 "))  # Number of simulations
         T = int(input(f"How many trading days? The minimum is 1 "))  # trading days to run the simulations over, not the days downloaded from yfinance
 
+        # Use the last known price to calculate the initial value of the portfolio
         all_S = stock["Close"].values.tolist()
-        S0 = round(all_S[-1][0], 3) * S  # Last closing price * no of shares (portfolio value)
+        S0 = round(all_S[-1][0], 3) * S  # Last closing price * no of shares
 
         number_of_steps = T
 
@@ -154,8 +173,17 @@ def main():
         num_simulations = int(input(f"How many simulations you want to run? Try at least 1000 "))  # Number of simulations
         T = int(input(f"How many trading days? The minimum is 1 "))  # trading days to run the simulations over, not the days downloaded from yfinance
 
-        # Fetch data (adjust the period as needed)
-        df = yf.download(tickers, start="2024-01-01", end="2025-01-01")['Close']
+        # Fetch data
+        try:
+            df = yf.download(tickers, start=START_DATE, end=END_DATE)['Close']
+        except Exception as e:
+            print(e)
+            sys.exit()
+
+        # Check that yfinance does not return an empty dataframe
+        if df.empty:
+            print(f"No data returned for this ticker list")
+            sys.exit()
 
         # Drop NaN values (if any)
         df.dropna(inplace=True)
