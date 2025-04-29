@@ -210,8 +210,8 @@ def main():
         # Apply Cholesky decomposition for correlated shocks
         correlated_shocks = np.einsum('ij,tjs->tis', L, rand_normals)
 
-        # Create a tensor and set the values at zero
-        simulated_prices = functions.init_tensor(T + 1, len(tickers), num_simulations)   # np.zeros((T + 1, len(tickers), num_simulations))
+        # Create a tensor and set the values to zero
+        simulated_prices = functions.init_tensor(T + 1, len(tickers), num_simulations)
         # Set the value of the first simulation to the last known price
         simulated_prices[0] = df.iloc[-1].values[:, np.newaxis]
 
@@ -243,7 +243,7 @@ def main():
         # Compute portfolio values at the beginning and at the end
         initial_value = np.dot(df.iloc[-1].values, num_shares)
         final_values = np.dot(simulated_prices[-1].T, num_shares)
-
+        print(simulated_prices)
         # Compute profit/loss distribution
         losses = initial_value - final_values
 
@@ -255,6 +255,7 @@ def main():
         VaR_99 = np.percentile(losses, 1)
         VaR_99_perc = round((VaR_99 / initial_value) * 100, 3)
 
+        print(VaR_95)
         print(f"Initial Portfolio Value: ${initial_value:.2f}")
         print()
         print(f"VaR after {T} days with confidence interval 95%: ${VaR_95:.2f} ({VaR_95_perc}%)")
