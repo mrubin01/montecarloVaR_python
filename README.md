@@ -1,9 +1,9 @@
-# Montecarlo VaR
+## Montecarlo VaR
 This program calculates the Value at Risk (VaR) for one or more equities using the Monte Carlo simulations.
 Moreover, it calculates the Expected Shortfall (ES) and the maximum drawdown.
 If the portfolio is composed of just one ticker, the Cholesky decomposition is not necessary
 
-# Steps
+## Steps
 1. Fetch data from Yahoo Finance
 2. Calculate daily returns and from those the log daily returns, mean (mu) and std (sigma)
 3. In case of one ticker, create an empty matrix and fill it with random prices having a normal distribution
