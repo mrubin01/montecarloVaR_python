@@ -16,13 +16,13 @@ DT = 1 / 252  # daily time step: if weekly then 1 / 52
 CONFIDENCE_95 = 5  # for 95% confidence
 CONFIDENCE_99 = 1  # for 99% confidence
 
-yesterday = datetime.now() - timedelta(days=1)
-END_DATE = yesterday.strftime('%Y-%m-%d')
+YESTERDAY = datetime.now() - timedelta(days=1)
+END_DATE = YESTERDAY.strftime('%Y-%m-%d')
 
-today = datetime.now()
-START_DATE = datetime(today.year - 1, 1, 1).strftime("%Y-%m-%d")
+TODAY = datetime.now()
+START_DATE = datetime(TODAY.year - 1, 1, 1).strftime("%Y-%m-%d")
 
-print_charts = False
+print_charts = True
 
 print(f"<-- It will be used data starting from {START_DATE} to {END_DATE} -->")
 print()
@@ -69,7 +69,6 @@ def main():
         S0 = round(all_S[-1][0], 3) * S  # Last closing price * no of shares
 
         number_of_steps = T
-
         # Initialize matrix for simulated prices
         if T == 1:
             simulated_prices = functions.init_matrix(number_of_steps + 1, N)
@@ -243,7 +242,7 @@ def main():
         # Compute portfolio values at the beginning and at the end
         initial_value = np.dot(df.iloc[-1].values, num_shares)
         final_values = np.dot(simulated_prices[-1].T, num_shares)
-        print(simulated_prices)
+
         # Compute profit/loss distribution
         losses = initial_value - final_values
 
@@ -255,7 +254,7 @@ def main():
         VaR_99 = np.percentile(losses, 1)
         VaR_99_perc = round((VaR_99 / initial_value) * 100, 3)
 
-        print(VaR_95)
+        # print(VaR_95)
         print(f"Initial Portfolio Value: ${initial_value:.2f}")
         print()
         print(f"VaR after {T} days with confidence interval 95%: ${VaR_95:.2f} ({VaR_95_perc}%)")
